@@ -18,7 +18,7 @@ class AIService {
   async generateResponse(query, context = {}, language = 'en') {
     try {
       // Check if API key is configured
-      if (!this.apiKey || this.apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
+      if (!this.apiKey || this.apiKey === 'AIzaSyDixdeq_tAs37GVEC5t58I_GEnKsSb7UHI') {
         throw new Error('API_KEY_NOT_CONFIGURED');
       }
 

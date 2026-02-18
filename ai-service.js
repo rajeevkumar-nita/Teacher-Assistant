@@ -9,6 +9,102 @@ class AIService {
   }
 
   /**
+   * Check if response text is complete (not truncated mid-sentence)
+   * Returns true if complete, false if likely truncated
+   */
+  isResponseComplete(text) {
+    if (!text || text.trim().length === 0) return false;
+    
+    // Check for sentence ending markers
+    const endsWithPunctuation = /[.!?:]\s*$/.test(text.trim());
+    
+    // Check for balanced brackets
+    const openRound = (text.match(/\(/g) || []).length;
+    const closeRound = (text.match(/\)/g) || []).length;
+    const openSquare = (text.match(/\[/g) || []).length;
+    const closeSquare = (text.match(/\]/g) || []).length;
+    const openCurly = (text.match(/\{/g) || []).length;
+    const closeCurly = (text.match(/\}/g) || []).length;
+    
+    const bracketsBalanced = openRound === closeRound && 
+                            openSquare === closeSquare && 
+                            openCurly === closeCurly;
+    
+    // Check for incomplete list patterns (ends with colon or dash without items)
+    const endsWithOpenList = /[:\-]\s*$/.test(text.trim());
+    
+    // Check for incomplete markdown headers or formatting
+    const incompleteFormatting = text.includes('**') && (text.match(/\*\*/g) || []).length % 2 !== 0;
+    
+    // Response is complete if: ends with punctuation AND brackets balanced AND no open list
+    const isComplete = endsWithPunctuation && bracketsBalanced && !endsWithOpenList && !incompleteFormatting;
+    
+    return isComplete;
+  }
+
+  /**
+   * Fetch continuation of incomplete response
+   * Sends original response + request to continue
+   */
+  async fetchContinuation(originalText, query, context, language) {
+    try {
+      console.log('Response truncated. Fetching continuation...');
+      
+      const continuationPrompt = `The previous response was incomplete. Here's what was said:
+
+"${originalText}"
+
+Continue from where it left off, completing the thought, and provide the rest of the answer. Continue naturally without repeating.`;
+
+      const requestBody = {
+        contents: [{
+          parts: [{
+            text: continuationPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
+      };
+
+      const continuationResponse = await this.makeRequest(requestBody);
+      const continuationText = this.extractResponseText(continuationResponse);
+      
+      console.log('Continuation received:', continuationText.substring(0, 100) + '...');
+      
+      // Merge: original + continuation (with space/newline if needed)
+      const merged = originalText.trim() + ' ' + continuationText.trim();
+      return merged;
+      
+    } catch (error) {
+      console.error('Error fetching continuation:', error);
+      // Return original text if continuation fails
+      return originalText;
+    }
+  }
+
+  /**
    * Generate a response from Gemini API
    * @param {string} query - Teacher's question
    * @param {object} context - Classroom context (grade, subject, etc.)
@@ -71,7 +167,13 @@ class AIService {
       const responseTime = Date.now() - startTime;
 
       // Extract response text
-      const responseText = this.extractResponseText(response);
+      let responseText = this.extractResponseText(response);
+
+      // Check if response is complete; if not, fetch continuation
+      if (!this.isResponseComplete(responseText)) {
+        console.log('Response appears incomplete. Auto-fetching continuation...');
+        responseText = await this.fetchContinuation(responseText, query, context, language);
+      }
 
       // Track analytics
       if (CONFIG.FEATURES.ANALYTICS) {

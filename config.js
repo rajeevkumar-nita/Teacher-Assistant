@@ -5,7 +5,7 @@ const CONFIG = {
     GEMINI_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     // User needs to add their API key here
     // Get free API key from: https://makersuite.google.com/app/apikey
-    GEMINI_API_KEY: 'AIzaSyDixdeq_tAs37GVEC5t58I_GEnKsSb7UHI',
+    GEMINI_API_KEY: 'AIzaSyCPY_oDz6P6rI1bVBTDiZTKa-JKhSsqYe8',
     TIMEOUT: 30000, // 30 seconds
     MAX_RETRIES: 3
   },
